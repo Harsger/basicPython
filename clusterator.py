@@ -15,7 +15,7 @@ def readTextFile( fileTOread , seperator = ' ' ):
     inputfile = open( str( fileTOread ) , 'r' )
     
     if inputfile.closed :
-        print " WARNING : file \'"+str(fileTOread)+"\' can not be opened "
+        print(" WARNING : file \'"+str(fileTOread)+"\' can not be opened ")
         return fileContent
 
     useSeperator = True
@@ -40,7 +40,7 @@ def readTextFile( fileTOread , seperator = ' ' ):
 def cartesianDistance( first , second ) :
     
     if len(first) != len(second):
-        print " ERROR : points have not the same size"
+        print(" ERROR : points have not the same size")
         return 0
 
     distance = 0
@@ -56,11 +56,13 @@ def kMeansCluster( data , expected=1 , bugger=False ):
     
     stopAt = 100
     
-    if expected >= len(data) :
-        print " ERROR : not enough data for expectation "
+    numberOFpoints = len(data)
+    
+    if expected >= numberOFpoints :
+        print(" ERROR : not enough data for expectation ")
         return data
     
-    cluster = data[:expected]
+    cluster = []
     
     dimensions = len( data[0] )
     
@@ -73,8 +75,39 @@ def kMeansCluster( data , expected=1 , bugger=False ):
             break
         
     if not sameSize :
-        print " ERROR : points in data do not have the same dimension "
+        print(" ERROR : points in data do not have the same dimensions ")
         return cluster
+    
+    averagePoints = float(numberOFpoints)/float(expected)
+    
+    for c in range(expected) :
+        
+        mean = [0 for d in range(dimensions)]
+        
+        toStart = int( float( averagePoints * float(c) ) )
+        toEnd = int( float( averagePoints * ( float(c) + 1 ) ) )
+        
+        print( ' '+str(c)+' start '+str(toStart)+' toEnd '+str(toEnd) )
+                
+        for d in range(dimensions) :
+        
+            for p in range( toStart , toEnd ) :
+                
+                mean[d] += data[p][d]
+            
+            mean[d] /= averagePoints
+            
+        cluster.append( mean )
+        
+    for mean in cluster :
+        
+        result = str(cluster.index(mean))+' \t '
+        
+        for d in range(dimensions) :
+            
+            result += " "+str(mean[d])
+            
+        print( str(result) )
     
     maximalDistance = 0
     
@@ -96,7 +129,7 @@ def kMeansCluster( data , expected=1 , bugger=False ):
     while allocating :
         
         if iteration > stopAt :
-            print " WARNING : more than "+str(stopAt)+" iterations => aborting "
+            print( " WARNING : more than "+str(stopAt)+" iterations => aborting " )
             break
         
         pointsINcluster = [[] for c in range(expected)]
@@ -115,7 +148,7 @@ def kMeansCluster( data , expected=1 , bugger=False ):
                     nearestCluster = cluster.index(mean)
                     
             if nearestCluster == -1 :
-                print " ERROR : no near cluster found "
+                print( " ERROR : no near cluster found " )
                 fatalError = True
                 break
             
@@ -136,7 +169,8 @@ def kMeansCluster( data , expected=1 , bugger=False ):
                     
                     mean[d] += data[p][d]
                 
-                mean[d] /= len( pointsINcluster[c] )
+                if len( pointsINcluster[c] ) != 0 :
+                    mean[d] /= len( pointsINcluster[c] )
                 
             newCluster.append( mean )
         
@@ -145,10 +179,10 @@ def kMeansCluster( data , expected=1 , bugger=False ):
         for points in pointsINcluster : 
             
             #if bugger :
-                #print " points in cluster "+str(pointsINcluster.index(points))
+                #print( " points in cluster "+str(pointsINcluster.index(points)) )
                 #strOFpoints = ''
                 #for p in points : strOFpoints += ' '+str(p)
-                #print str(strOFpoints)
+                #print( str(strOFpoints) )
             
             sameClusterFound = False
             
@@ -170,7 +204,7 @@ def kMeansCluster( data , expected=1 , bugger=False ):
         
         if bugger : 
             
-            print " iteration "+str(iteration)
+            print( " iteration "+str(iteration) )
         
             for mean in cluster :
                 
@@ -180,7 +214,7 @@ def kMeansCluster( data , expected=1 , bugger=False ):
                     
                     result += " "+str(mean[d])
                     
-                print result+' \t '+str( len( pointsINcluster[ cluster.index(mean) ] ) )
+                print( result+' \t '+str( len( pointsINcluster[ cluster.index(mean) ] ) ) )
         
         iteration += 1
         
@@ -193,7 +227,7 @@ def kMeansCluster( data , expected=1 , bugger=False ):
             
             result += " "+str(mean[d])
             
-        if bugger : print result
+        if bugger : print( str(result) )
         
     return cluster
             
@@ -213,21 +247,21 @@ def main(argv):
         
     except getopt.GetoptError:
         
-        print usage
+        print( usage )
         sys.exit(2)
         
     if len(argv) < 1:
         
-        print " arguments required "
-        print str(usage)
+        print( " arguments required " )
+        print(  str(usage) )
         sys.exit(2)
         
     for opt, arg in opts:
         
         if opt in ("-h", "--help"):
-            print usage
-            print " D option enables debug mode "
-            print " programm is intended for finding cluster of numerical data in text files "
+            print( usage )
+            print( " D option enables debug mode " )
+            print( " programm is intended for finding cluster of numerical data in text files " )
             sys.exit()
             
         elif opt in ("-f", "--filename"):
@@ -242,15 +276,15 @@ def main(argv):
         elif opt in ("-D", "--DebugMode"):
             debug = True
                     
-    print " filename        : "+str(filename)
-    print " expectedCluster : "+str(expectedCluster)
-    if debug : print " debug mode : enabled"
+    print( " filename        : "+str(filename) )
+    print( " expectedCluster : "+str(expectedCluster) )
+    if debug : print( " debug mode : enabled" )
     
     textinput = readTextFile( filename , seperator )
     
     data = [[float(word) for word in line] for line in textinput]
     
-    print " # filled lines in file : "+str( len( data ) )
+    print( " # filled lines in file : "+str( len( data ) ) )
     
     kMeansCluster( data , expectedCluster , debug )
 
