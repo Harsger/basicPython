@@ -89,7 +89,6 @@ def readParameterInput(argv):
 def main(argv):
     global parameters , data
     readParameterInput(argv)
-    print(" RESHAPE ")
     if parameters["mapFile"] == None:
         parameters["dimensions"] = [
                                         int(parameters["nframes"]) , 
@@ -100,8 +99,58 @@ def main(argv):
         parameters["dimensions"] = [ parameters["nframes"] ]
         for d in parameters["rowmap"].shape :
             parameters["dimensions"].append(d)
+    if len(parameters["dimensions"]) > 3:
+        preDivisions = int(parameters["dimensions"][1])
+        if( 
+            (
+                int(parameters["colDivisions"]) < preDivisions
+                and
+                preDivisions % int(parameters["colDivisions"]) != 0
+            )
+            or
+            (
+                int(parameters["colDivisions"]) > preDivisions
+                and
+                int(parameters["colDivisions"]) % preDivisions != 0
+            )
+        ):
+            print(
+                    " ERROR : data-divisions ("+
+                    str(preDivisions)+
+                    ") do not match specified divisions ("+
+                    str(parameters["colDivisions"])+
+                    ") "
+                )
+            sys.exit(5)
+        channelsPerDivision = int(parameters["dimensions"][3])
+        totalColumns = preDivisions * channelsPerDivision
+        if totalColumns != int(parameters["ncols"]) :
+            print(
+                    " ERROR : data ("+
+                    str(totalColumns)+
+                    " do not match specified columns ("+
+                    str(parameters["ncols"])+
+                    ") "
+                )
+            sys.exit(6)
+        totalRows = parameters["dimensions"][2]
+        if totalRows != int(parameters["nrows"]) :
+            print(
+                    " ERROR : data ("+
+                    str(parameters["dimensions"][2])+
+                    " do not match specified rows ("+
+                    str(parameters["nrows"])+
+                    ") "
+                )
+            sys.exit(7)
+    else:
+        preDivisions = int(parameters["colDivisions"])
+        channelsPerDivision = int(parameters["ncols"])/preDivisions
+        totalColumns = int(parameters["ncols"])
+    print(" RESHAPE ",end="")
+    sys.stdout.flush()
     data = np.reshape( data , tuple( parameters["dimensions"] ) )
-    print(" -> data.shape : "+str(data.shape))
+    print(" > data.shape : "+str(data.shape))
     dimensions = list(parameters["dimensions"])
     for i in range(len(dimensions)): dimensions[i] = 1
     dimensions[0] = parameters["nframes"]
@@ -111,6 +160,7 @@ def main(argv):
         #outname = outname[ 0 : outname.rindex(".") ] 
     #outname += ".root"
     #outfile = TFile( outname , "RECREATE" )
+    print(" RECREATE "+str(parameters["outname"]))
     outfile = TFile( parameters["outname"] , "RECREATE" )
     print(" SEARCH ")
     h_underflowPixels = ROOT.TH2D(
@@ -120,6 +170,9 @@ def main(argv):
                                 int(parameters["nrows"]) , 
                                 -0.5 , float(parameters["nrows"])-0.5 
                             )
+    h_underflowPixels.SetXTitle("column")
+    h_underflowPixels.SetYTitle("row")
+    h_underflowPixels.SetZTitle("ADU")
     h_overflowPixels = ROOT.TH2D(
                                 "overflowPixels" , "overflowPixels" ,
                                 int(parameters["ncols"]) , 
@@ -127,6 +180,9 @@ def main(argv):
                                 int(parameters["nrows"]) , 
                                 -0.5 , float(parameters["nrows"])-0.5 
                             )
+    h_overflowPixels.SetXTitle("column")
+    h_overflowPixels.SetYTitle("row")
+    h_overflowPixels.SetZTitle("ADU")
     if( parameters["mapFile"] == None ):
         lineOrder = np.tile( 
                         np.tile( 
@@ -155,18 +211,20 @@ def main(argv):
                                     transposeOrder , 
                                     tuple(dimensions) 
                                 ).astype(float)
-    print(" -underflow ")
-    outflowData = ( data <= parameters["rangeMin"] ).astype(float)
-    print(" -FILL ")
+    print(" -underflow ",end="")
+    sys.stdout.flush()
+    outflowData = ( data <= int(parameters["rangeMin"]) ).astype(float)
+    print(" > FILL ")
     h_underflowPixels.FillN( 
                                 outflowData.size , 
                                 transposeOrder.flatten() , 
                                 lineOrder.flatten() , 
                                 outflowData.flatten() 
                             )
-    print(" -overflow ")
-    outflowData = ( data >= parameters["rangeMax"] ).astype(float)
-    print(" -FILL ")
+    print(" -overflow ",end="")
+    sys.stdout.flush()
+    outflowData = ( data >= int(parameters["rangeMax"]) ).astype(float)
+    print(" > FILL ")
     h_overflowPixels.FillN( 
                                 outflowData.size , 
                                 transposeOrder.flatten() , 
@@ -176,8 +234,8 @@ def main(argv):
     h_valuePerChannel = [ [] , [] ]
     print(" ITERATE ")
     for d in range(2):
-        if d == 1: print(" -ROWS -> colDivision ",end="\t")
-        else:      print(" -COLS -> rowDivision ",end="\t")
+        if d == 1: print(" -ROWS > colDivision ",end="\t")
+        else:      print(" -COLS > rowDivision ",end="\t")
         sys.stdout.flush()
         toUse , other = "col" , "row"
         if d == 1: toUse , other = other , toUse
@@ -223,6 +281,9 @@ def main(argv):
                         float(parameters["rangeMax"])
                 )
             )
+            h_valuePerChannel[d][r].SetXTitle("column")
+            if d == 1 : h_valuePerChannel[d][r].SetXTitle("row")
+            h_valuePerChannel[d][r].SetYTitle("ADU")
             if parameters["mapFile"] == None:
                 colStart , colEnd = 0 , nbins
                 rowStart , rowEnd = 0 , nbins
@@ -241,20 +302,37 @@ def main(argv):
                     weights
                 )
             else:
-                colStart , colEnd = 0 , int(parameters["colDivisions"])
-                rowStart , rowEnd = 0 , int(parameters["nrows"])
+                colStart , colEnd = 0 , preDivisions
+                rowStart , rowEnd = 0 , totalRows
+                chaStart , chaEnd = 0 , channelsPerDivision
                 if d == 1:
-                    colStart = r
-                    colEnd   = r + 1 
+                    lowEdge  = r * divisionWidth
+                    colStart = lowEdge / channelsPerDivision
+                    chaStart = lowEdge % channelsPerDivision
+                    uppEdge  = ( r + 1 ) * divisionWidth
+                    colEnd   = uppEdge / channelsPerDivision
+                    chaEnd   = uppEdge % channelsPerDivision
+                    if colEnd == colStart : colEnd += 1
+                    if chaEnd == 0        : chaEnd = channelsPerDivision
                 else:
                     rowStart = divisionWidth * r
                     rowEnd   = divisionWidth * ( r + 1 )
                 h_valuePerChannel[d][r].FillN(
                     weights.size ,
-                    lineOrder[:,colStart:colEnd,rowStart:rowEnd,:].flatten() ,
-                    data[:,colStart:colEnd,rowStart:rowEnd,:]
-                                                            .flatten()
-                                                            .astype(float) ,
+                    lineOrder[
+                                : , 
+                                colStart:colEnd , 
+                                rowStart:rowEnd , 
+                                chaStart:chaEnd
+                            ]
+                            .flatten() ,
+                    data[
+                            : ,
+                            colStart:colEnd , 
+                            rowStart:rowEnd , 
+                            chaStart:chaEnd
+                        ]
+                        .flatten().astype(float) ,
                     weights
                 )
         print("")
