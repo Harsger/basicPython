@@ -154,14 +154,15 @@ def main(argv):
     dimensions = list(parameters["dimensions"])
     for i in range(len(dimensions)): dimensions[i] = 1
     dimensions[0] = parameters["nframes"]
-    ##outname from parameter-file-name##########################################
-    #outname = parameters["parameterFile"] 
-    #if "." in outname :
-        #outname = outname[ 0 : outname.rindex(".") ] 
-    #outname += ".root"
-    #outfile = TFile( outname , "RECREATE" )
-    print(" RECREATE "+str(parameters["outname"]))
-    outfile = TFile( parameters["outname"] , "RECREATE" )
+    if parameters["outname"].endswith(".root"):
+        writename = parameters["outname"]
+    else:
+        writename = parameters["parameterFile"] 
+        if "." in outname :
+            writename = outname[ 0 : outname.rindex(".") ] 
+        writename += ".root"
+    print(" RECREATE "+str(writename))
+    outfile = TFile( writename , "RECREATE" )
     print(" SEARCH ")
     h_underflowPixels = ROOT.TH2D(
                                 "underflowPixels" , "underflowPixels" ,
