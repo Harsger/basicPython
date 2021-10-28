@@ -83,8 +83,24 @@ def readParameterInput(argv):
         parameters["offset"] = np.zeros( frameSize )
         parameters["noise" ] = np.zeros( frameSize )
     if parameters["mapFile"] != None:
-        parameters["rowmap"] = np.load( parameters["mapFile"] )["rowmap"   ][0]
-        parameters["colmap"] = np.load( parameters["mapFile"] )["columnmap"][0]
+        parameters["rowmap"] = np.load( parameters["mapFile"] )["rowmap"   ]
+        parameters["colmap"] = np.load( parameters["mapFile"] )["columnmap"]
+        if parameters["rowmap"].shape != parameters["colmap"].shape:
+            print(" ERROR : unequal-sized row- and column-maps")
+            sys.exit(5)
+        if parameters["rowmap"].shape[0] == 1:
+            parameters["rowmap"] = parameters["rowmap"][0]
+            parameters["colmap"] = parameters["colmap"][0]
+        elif parameters["rowmap"].shape[1] == 1:
+            parameters["rowmap"] = parameters["rowmap"][:,0]
+            parameters["colmap"] = parameters["colmap"][:,0]
+    if( 
+        np.amax( parameters["rowmap"] )+1 != int(parameters["nrows"])
+        or
+        np.amax( parameters["colmap"] )+1 != int(parameters["ncols"])
+    ):
+        print(" ERROR : mapping does not fit specification ")
+        sys.exit(6)
 
 def main(argv):
     global parameters , data
@@ -99,54 +115,6 @@ def main(argv):
         parameters["dimensions"] = [ parameters["nframes"] ]
         for d in parameters["rowmap"].shape :
             parameters["dimensions"].append(d)
-    if len(parameters["dimensions"]) > 3:
-        preDivisions = int(parameters["dimensions"][1])
-        if( 
-            (
-                int(parameters["colDivisions"]) < preDivisions
-                and
-                preDivisions % int(parameters["colDivisions"]) != 0
-            )
-            or
-            (
-                int(parameters["colDivisions"]) > preDivisions
-                and
-                int(parameters["colDivisions"]) % preDivisions != 0
-            )
-        ):
-            print(
-                    " ERROR : data-divisions ("+
-                    str(preDivisions)+
-                    ") do not match specified divisions ("+
-                    str(parameters["colDivisions"])+
-                    ") "
-                )
-            sys.exit(5)
-        channelsPerDivision = int(parameters["dimensions"][3])
-        totalColumns = preDivisions * channelsPerDivision
-        if totalColumns != int(parameters["ncols"]) :
-            print(
-                    " ERROR : data ("+
-                    str(totalColumns)+
-                    " do not match specified columns ("+
-                    str(parameters["ncols"])+
-                    ") "
-                )
-            sys.exit(6)
-        totalRows = parameters["dimensions"][2]
-        if totalRows != int(parameters["nrows"]) :
-            print(
-                    " ERROR : data ("+
-                    str(parameters["dimensions"][2])+
-                    " do not match specified rows ("+
-                    str(parameters["nrows"])+
-                    ") "
-                )
-            sys.exit(7)
-    else:
-        preDivisions = int(parameters["colDivisions"])
-        channelsPerDivision = int(parameters["ncols"])/preDivisions
-        totalColumns = int(parameters["ncols"])
     print(" RESHAPE ",end="")
     sys.stdout.flush()
     data = np.reshape( data , tuple( parameters["dimensions"] ) )
@@ -161,7 +129,7 @@ def main(argv):
         if "." in outname :
             writename = outname[ 0 : outname.rindex(".") ] 
         writename += ".root"
-    print(" RECREATE "+str(writename))
+    print(" CREATE "+str(writename))
     outfile = TFile( writename , "RECREATE" )
     print(" SEARCH ")
     h_underflowPixels = ROOT.TH2D(
@@ -222,7 +190,7 @@ def main(argv):
                                 lineOrder.flatten() , 
                                 outflowData.flatten() 
                             )
-    print(" -overflow ",end="")
+    print(" -overflow  ",end="")
     sys.stdout.flush()
     outflowData = ( data >= int(parameters["rangeMax"]) ).astype(float)
     print(" > FILL ")
@@ -256,9 +224,16 @@ def main(argv):
                                 )
             lineOrder = lineOrder.flatten()
         else:
-            if d == 1: lineOrder = parameters["rowmap"]
-            else:      lineOrder = parameters["colmap"]
-            lineOrder = np.tile( lineOrder , tuple(dimensions) ).astype(float)
+            lineOrder      = parameters[str(toUse)+"map"]
+            transposeOrder = parameters[str(other)+"map"]
+            lineOrder      = np.tile( 
+                                        lineOrder , 
+                                        tuple(dimensions)
+                                    ).astype(float)
+            transposeOrder = np.tile(
+                                        transposeOrder , 
+                                        tuple(dimensions)
+                                    ).astype(float)
         weights = np.ones( ( 
                                 int(parameters["nframes"]) , 
                                 nbins , 
@@ -303,38 +278,18 @@ def main(argv):
                     weights
                 )
             else:
-                colStart , colEnd = 0 , preDivisions
-                rowStart , rowEnd = 0 , totalRows
-                chaStart , chaEnd = 0 , channelsPerDivision
-                if d == 1:
-                    lowEdge  = r * divisionWidth
-                    colStart = lowEdge / channelsPerDivision
-                    chaStart = lowEdge % channelsPerDivision
-                    uppEdge  = ( r + 1 ) * divisionWidth
-                    colEnd   = uppEdge / channelsPerDivision
-                    chaEnd   = uppEdge % channelsPerDivision
-                    if colEnd == colStart : colEnd += 1
-                    if chaEnd == 0        : chaEnd = channelsPerDivision
-                else:
-                    rowStart = divisionWidth * r
-                    rowEnd   = divisionWidth * ( r + 1 )
+                weights = np.logical_and( 
+                            transposeOrder >= divisionWidth * r , 
+                            transposeOrder <  divisionWidth * ( r + 1 )
+                        )
+                toFill         =      data[ weights ].flatten()
+                channelNumbers = lineOrder[ weights ].flatten()
+                weights        =   weights[ weights ].flatten()
                 h_valuePerChannel[d][r].FillN(
                     weights.size ,
-                    lineOrder[
-                                : , 
-                                colStart:colEnd , 
-                                rowStart:rowEnd , 
-                                chaStart:chaEnd
-                            ]
-                            .flatten() ,
-                    data[
-                            : ,
-                            colStart:colEnd , 
-                            rowStart:rowEnd , 
-                            chaStart:chaEnd
-                        ]
-                        .flatten().astype(float) ,
-                    weights
+                    channelNumbers ,
+                    toFill.astype(float) ,
+                    weights.astype(float)
                 )
         print("")
     print(" WRITE ")
