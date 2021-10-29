@@ -154,51 +154,45 @@ def main(argv):
     h_overflowPixels.SetZTitle("ADU")
     if( parameters["mapFile"] == None ):
         lineOrder = np.tile( 
-                        np.tile( 
                             np.arange( float(parameters["ncols"]) ) , 
                             (int(parameters["nrows"]),1) 
-                        ) , 
-                        (int(parameters["nframes"]),1,1) 
-                    ).astype(float)
-        transposeOrder = np.tile( 
-                            np.transpose(
-                                np.tile( 
+                        ).flatten()
+        transposeOrder = np.transpose(
+                            np.tile( 
                                     np.arange( float(parameters["nrows"]) ) , 
                                     (int(parameters["ncols"]),1) 
-                                )
-                            ) , 
-                            (int(parameters["nframes"]),1,1) 
-                        ).astype(float)
+                            )
+                        ).flatten()
     else:
-        lineOrder      = parameters["rowmap"]
-        transposeOrder = parameters["colmap"]
-        lineOrder      = np.tile( 
-                                    lineOrder , 
-                                    tuple(dimensions) 
-                                ).astype(float)
-        transposeOrder = np.tile( 
-                                    transposeOrder , 
-                                    tuple(dimensions) 
-                                ).astype(float)
+        lineOrder      = parameters["rowmap"].astype(float).flatten()
+        transposeOrder = parameters["colmap"].astype(float).flatten()
     print(" -underflow ",end="")
     sys.stdout.flush()
-    outflowData = ( data <= int(parameters["rangeMin"]) ).astype(float)
+    outflowData = np.sum( 
+                            ( data <= int(parameters["rangeMin"]) ) ,
+                            axis  =     0 ,
+                            dtype = float
+                        ).flatten()
     print(" > FILL ")
     h_underflowPixels.FillN( 
                                 outflowData.size , 
-                                transposeOrder.flatten() , 
-                                lineOrder.flatten() , 
-                                outflowData.flatten() 
+                                transposeOrder , 
+                                lineOrder , 
+                                outflowData 
                             )
     print(" -overflow  ",end="")
     sys.stdout.flush()
-    outflowData = ( data >= int(parameters["rangeMax"]) ).astype(float)
+    outflowData = np.sum( 
+                            ( data >= int(parameters["rangeMax"]) ) ,
+                            axis  =     0 ,
+                            dtype = float
+                        ).flatten()
     print(" > FILL ")
     h_overflowPixels.FillN( 
                                 outflowData.size , 
-                                transposeOrder.flatten() , 
-                                lineOrder.flatten() , 
-                                outflowData.flatten() 
+                                transposeOrder , 
+                                lineOrder , 
+                                outflowData 
                             )
     h_valuePerChannel = [ [] , [] ]
     print(" ITERATE ")
@@ -299,3 +293,4 @@ def main(argv):
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+
