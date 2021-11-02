@@ -14,6 +14,7 @@ parameters = {
                 "nframes"        :              1 ,
                 "rowDivisions"   :              1 ,
                 "colDivisions"   :              1 ,
+                "batchSize"      :         "none" ,
                 "noise"          :           None ,
                 "offset"         :           None ,
                 "offsetFile"     :         "none" ,
@@ -166,39 +167,46 @@ def main(argv):
     else:
         lineOrder      = parameters["rowmap"].astype(float).flatten()
         transposeOrder = parameters["colmap"].astype(float).flatten()
-    print(" -underflow ",end="")
+    print(" -underflow ")
     sys.stdout.flush()
     outflowData = np.sum( 
                             ( data <= int(parameters["rangeMin"]) ) ,
                             axis  =     0 ,
                             dtype = float
                         ).flatten()
-    print(" > FILL ")
     h_underflowPixels.FillN( 
                                 outflowData.size , 
                                 transposeOrder , 
                                 lineOrder , 
                                 outflowData 
                             )
-    print(" -overflow  ",end="")
+    print(" -overflow  ")
     sys.stdout.flush()
     outflowData = np.sum( 
                             ( data >= int(parameters["rangeMax"]) ) ,
                             axis  =     0 ,
                             dtype = float
                         ).flatten()
-    print(" > FILL ")
     h_overflowPixels.FillN( 
                                 outflowData.size , 
                                 transposeOrder , 
                                 lineOrder , 
                                 outflowData 
                             )
+    if parameters["batchSize"].isdigit() :
+        framesPERbatch = int(parameters["batchSize"])
+        nbatches = int(parameters["nframes"]) / framesPERbatch
+        if int(parameters["nframes"]) < nbatches * framesPERbatch :
+            nbatches += 1
+    else:
+        framesPERbatch = int(parameters["nframes"])
+        nbatches = 1
+    dimensions[0] = framesPERbatch
     h_valuePerChannel = [ [] , [] ]
     print(" ITERATE ")
     for d in range(2):
-        if d == 1: print(" -ROWS > colDivision ",end="\t")
-        else:      print(" -COLS > rowDivision ",end="\t")
+        if d == 1: print(" -ROWS > colDivision ",end=" ")
+        else:      print(" -COLS > rowDivision ",end=" ")
         sys.stdout.flush()
         toUse , other = "col" , "row"
         if d == 1: toUse , other = other , toUse
@@ -214,29 +222,21 @@ def main(argv):
                 lineOrder = np.transpose( lineOrder )
             lineOrder = np.tile(
                                     lineOrder ,
-                                    ( int(parameters["nframes"]) , 1 , 1 ) 
+                                    ( framesPERbatch , 1 , 1 ) 
                                 )
             lineOrder = lineOrder.flatten()
         else:
             lineOrder      = parameters[str(toUse)+"map"]
             transposeOrder = parameters[str(other)+"map"]
-            lineOrder      = np.tile( 
-                                        lineOrder , 
-                                        tuple(dimensions)
-                                    ).astype(float)
-            transposeOrder = np.tile(
-                                        transposeOrder , 
-                                        tuple(dimensions)
-                                    ).astype(float)
         weights = np.ones( ( 
-                                int(parameters["nframes"]) , 
+                                framesPERbatch , 
                                 nbins , 
                                 divisionWidth 
-                            ) )
-        weights = weights.flatten()
+                            ) ).flatten()
         for r in range( ndivisions ):
-            #print(" -- "+str(r))
-            print(":"+str(r),end="")
+            if ndivisions > 1 :
+                if nbatches > 1 : print(" \n --"+str(r),end=": ")
+                else :            print(":"  +str(r),end="" )
             sys.stdout.flush()
             title = ""
             if d == 1: title += "rowValues_colD"
@@ -263,28 +263,45 @@ def main(argv):
                 else:
                     rowStart = divisionWidth * r
                     rowEnd   = divisionWidth * ( r + 1 )
-                h_valuePerChannel[d][r].FillN(
-                    weights.size ,
-                    lineOrder ,
-                    data[:,rowStart:rowEnd,colStart:colEnd]
-                                                        .flatten()
-                                                        .astype(float) ,
-                    weights
-                )
+                for b in range(nbatches):
+                    batchStart = framesPERbatch * b
+                    batchEnd   = framesPERbatch * ( b + 1 )
+                    toFill = data[
+                                    batchStart: batchEnd ,
+                                    rowStart  : rowEnd   ,
+                                    colStart  : colEnd
+                                ].flatten().astype(float)
+                    h_valuePerChannel[d][r].FillN(
+                        toFill.size ,
+                        lineOrder ,
+                        toFill ,
+                        weights
+                    )
             else:
-                weights = np.logical_and( 
+                mask = np.logical_and( 
                             transposeOrder >= divisionWidth * r , 
                             transposeOrder <  divisionWidth * ( r + 1 )
                         )
-                toFill         =      data[ weights ].flatten()
-                channelNumbers = lineOrder[ weights ].flatten()
-                weights        =   weights[ weights ].flatten()
-                h_valuePerChannel[d][r].FillN(
-                    weights.size ,
-                    channelNumbers ,
-                    toFill.astype(float) ,
-                    weights.astype(float)
-                )
+                channelNumbers = np.tile( 
+                                            lineOrder[ mask ] ,
+                                            tuple(dimensions)
+                                        ).flatten()
+                weights = np.tile( mask[ mask ] , tuple(dimensions) ).flatten()
+                for b in range(nbatches):
+                    if b > 0 and int(b)%(int(nbatches)/10)==0:
+                        print(str(int(float(b)/float(nbatches)*100)),end="% ")
+                        sys.stdout.flush()
+                    batchStart = framesPERbatch * b
+                    batchEnd   = framesPERbatch * ( b + 1 )
+                    if batchEnd == int(parameters["nframes"]):
+                        batchEnd += 1
+                    toFill = data[ batchStart:batchEnd , mask ].flatten()
+                    h_valuePerChannel[d][r].FillN(
+                        toFill.size ,
+                        channelNumbers.astype(float) ,
+                        toFill.astype(float) ,
+                        weights.flatten().astype(float)
+                    )
         print("")
     print(" WRITE ")
     outfile.Write()
