@@ -185,8 +185,14 @@ def readParameterInput(argv):
                                 int(parameters["nrows"]) 
                             ) 
     if parameters["mapFile"] != None:
-        parameters["rowmap"] = np.load( parameters["mapFile"] )["rowmap"   ][0]
-        parameters["colmap"] = np.load( parameters["mapFile"] )["columnmap"][0]
+        parameters["rowmap"] = np.load( parameters["mapFile"] )["rowmap"   ]
+        parameters["colmap"] = np.load( parameters["mapFile"] )["columnmap"]
+        if parameters["rowmap"].shape[0] == 1:
+            parameters["rowmap"] = parameters["rowmap"][0]
+            parameters["colmap"] = parameters["colmap"][0]
+        elif parameters["rowmap"].shape[1] == 1:
+            parameters["rowmap"] = parameters["rowmap"][:,0]
+            parameters["colmap"] = parameters["colmap"][:,0]
         parameters["frameSize"] = tuple( parameters["rowmap"].shape )
     if parameters["offsetFile"] == "none" :
         print(" OFFSET from current file ")
