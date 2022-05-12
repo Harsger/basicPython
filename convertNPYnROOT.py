@@ -145,6 +145,76 @@ def createHistFromArray( inputArray , histname ) :
         hist = createHistFromArray( inputArray.flatten() , histname )
     return hist
 
+def positionsFromEdges( edges ) :
+    if len(edges.shape) != 1 :
+        return edges
+    entries = edges.shape[0]
+    return np.append( 
+                        [ ( edges[0] * 3. - edges[1] ) * 0.5 ] ,
+                        np.append(
+                            ( edges[1:] + edges[ 0 : entries-1 ] ) * 0.5 , 
+                            [
+                                (
+                                    edges[entries-1] * 3. 
+                                    - 
+                                    edges[entries-2] 
+                                ) * 0.5
+                            ]
+                        )
+                    )
+
+def create1DhistFromArray( inputArray , histname , edges ) :
+    hist = ROOT.TH1D()
+    if(
+        len(inputArray.shape) != 1
+        or
+        len(edges.shape) != 1
+        or
+        inputArray.shape[0]-1 != edges.shape[0]
+    ) :
+        return hist
+    hist = ROOT.TH1D( histname , histname , edges.shape[0]-1 , edges )
+    positions = positionsFromEdges( edges )
+    hist.FillN( inputArray.size , positions , inputArray )
+    return hist
+
+def create2DhistFromArray( inputArray , histname , edgesX , edgesY ) :
+    hist = ROOT.TH2D()
+    if(
+        len(inputArray.shape) != 2
+        or
+        len(edgesX.shape) != 1
+        or
+        len(edgesY.shape) != 1
+        or
+        inputArray.shape[0]-1 != edgesX.shape[0]
+        or
+        inputArray.shape[1]-1 != edgesY.shape[0]
+    ) :
+        return hist
+    hist = ROOT.TH2D( 
+                        histname , histname , 
+                        edgesX.shape[0]-1 , edgesX ,
+                        edgesY.shape[0]-1 , edgesY
+                    )
+    positionsX = positionsFromEdges( edgesX )
+    positionsY = positionsFromEdges( edgesY )
+    hist.FillN( 
+                inputArray.size , 
+                np.tile( 
+                    positionsX , 
+                    ( inputArray.shape[1] , 1 )
+                ).astype(float).flatten() ,
+                np.transpose(
+                    np.tile( 
+                        positionsY , 
+                        ( inputArray.shape[0] , 1 )
+                    )
+                ).astype(float).flatten() , 
+                inputArray.astype(float).flatten() 
+            )
+    return hist
+
 def main(argv) :
     global cpp_code_readhist
     if len(argv) < 1 :
@@ -278,6 +348,12 @@ def main(argv) :
             histsTOwrite = ROOT.TObjArray()
             histsTOwrite.SetOwner(True)
             for name , data in inputData.items() :
+                if( 
+                    name.endswith("_edges" ) or 
+                    name.endswith("_edgesX") or 
+                    name.endswith("_edgesY") 
+                ) :
+                    continue
                 print( 
                         " "   + str(name) +
                         " : " + str( data.dtype ) + 
@@ -294,7 +370,30 @@ def main(argv) :
                 if combine :
                     histname = f.replace(".npz","_")
                     histname += str(name)
-                hist = createHistFromArray( data , histname )
+                hist = ROOT.TH1D()
+                if( 
+                    len(data.shape) == 1
+                    and
+                    str(name)+"_edges" in inputData.keys()
+                ) :
+                    hist = create1DhistFromArray( 
+                                                data , histname , 
+                                                inputData[str(name)+"_edges"] 
+                                            )
+                elif(
+                    len(data.shape) == 2
+                    and
+                    str(name)+"_edgesX" in inputData.keys()
+                    and
+                    str(name)+"_edgesY" in inputData.keys()
+                ) :
+                    hist = create2DhistFromArray( 
+                                                data , histname , 
+                                                inputData[str(name)+"_edgesX"] , 
+                                                inputData[str(name)+"_edgesY"] 
+                                            )
+                if hist.GetName() != histname :
+                    hist = createHistFromArray( data , histname )
                 if hist.GetName() != histname :
                     hist.Delete()
                     print( " > skipped " )
