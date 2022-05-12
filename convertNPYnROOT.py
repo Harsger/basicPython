@@ -215,6 +215,22 @@ def create2DhistFromArray( inputArray , histname , edgesX , edgesY ) :
             )
     return hist
 
+def graphTOarray( graph ) :
+    data = np.empty((0))
+    if graph.ClassName() == "TGraphErrors" :
+        data = np.array([
+            graph.GetX() , graph.GetY() , graph.GetEX() , graph.GetEY()
+        ])
+    elif graph.ClassName() == "TGraphAsymmErrors" :
+        data = np.array([
+            graph.GetX()      , graph.GetY()      , 
+            graph.GetEXlow()  , graph.GetEYlow()  ,
+            graph.GetEXhigh() , graph.GetEYhigh() 
+        ])
+    else :
+        data = np.array([ graph.GetX() , graph.GetY() ])
+    return data
+    
 def main(argv) :
     global cpp_code_readhist
     if len(argv) < 1 :
@@ -286,6 +302,8 @@ def main(argv) :
                     not rootObject.ClassName().startswith( "TH1" )
                     and
                     not rootObject.ClassName().startswith( "TH2" )
+                    and
+                    not rootObject.ClassName().startswith( "TGraph" )
                 ) :
                     continue
                 if not onlyCommonCharacters( rootObject.GetName() ) :
@@ -310,6 +328,9 @@ def main(argv) :
                     dataTOwrite[writename] = np.array( histReader.edges2D[0] )
                     writename = str(histname)+"Y"
                     dataTOwrite[writename] = np.array( histReader.edges2D[1] )
+                elif rootObject.ClassName().startswith( "TGraph" ) :
+                    dataTOwrite[str(histname)+"_graph"] = graphTOarray( 
+                                                                rootObject )
             if not combine :
                 np.savez( f.replace( ".root" , ".npz" ) , **dataTOwrite )
         elif foundType == ".npy" :
