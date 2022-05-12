@@ -128,6 +128,21 @@ def createHistFromArray( inputArray , histname ) :
                             ).astype(float).flatten() , 
                     inputArray.astype(float).flatten()
                 )
+    elif len(inputArray.shape) == 3 :
+        hist = ROOT.TObjArray()
+        hist.SetName(histname)
+        hist.SetOwner(True)
+        lowestDimension = min( inputArray.shape )
+        dimensionIndex  = inputArray.shape.index( lowestDimension )
+        for i in range(lowestDimension) :
+            hist.Add( 
+                        createHistFromArray( 
+                            np.take( inputArray , i , axis=dimensionIndex ) , 
+                            str(histname)+"_"+str(i) 
+                        ) 
+                    )
+    elif len(inputArray.shape) > 3 :
+        hist = createHistFromArray( inputArray.flatten() , histname )
     return hist
 
 def main(argv) :
@@ -230,10 +245,15 @@ def main(argv) :
         elif foundType == ".npy" :
             inputArray = np.load( readname )
             print( 
-                    " : " + str( inputArray.shape ) + 
-                    " : " + str( inputArray.dtype ) 
+                    " : " + str( inputArray.dtype ) + 
+                    " : " + str( inputArray.shape ) ,
+                    end=""
                 )
-            inputArray = inputArray.squeeze()
+            if 1 in inputArray.shape :
+                inputArray = inputArray.squeeze()
+                print( " > " + str( inputArray.shape ) )
+            else :
+                print("")
             histname = f.replace(".npy","")
             if not combine :
                 histname = "hist"
@@ -260,18 +280,20 @@ def main(argv) :
             for name , data in inputData.items() :
                 print( 
                         " "   + str(name) +
+                        " : " + str( data.dtype ) + 
                         " : " + str( data.shape ) ,
                         end=""
                     )
                 if not onlyCommonCharacters( name ) :
                     print( " > skipped " )
                     continue
-                data = data.squeeze()
+                if 1 in data.shape :
+                    data = data.squeeze()
+                    print( " > " + str( data.shape ) , end="" )
                 histname = name
                 if combine :
                     histname = f.replace(".npz","_")
                     histname += str(name)
-                print( " > " + str( data.shape ) , end="" )
                 hist = createHistFromArray( data , histname )
                 if hist.GetName() != histname :
                     hist.Delete()
