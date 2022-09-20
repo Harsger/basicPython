@@ -263,6 +263,7 @@ def main(argv):
         timeXaxis = TimeAxisItem( orientation = 'bottom' )
         timeXaxis.attachToPlotItem( plotMap[p] )
         plotMap[p].getAxis('bottom').enableAutoSIPrefix( False )
+        plotMap[p].addLegend()
         plotCount += 1
         for c , spec in enumerate( specifiers ) :
             if spec[2] == p :
@@ -301,6 +302,7 @@ def main(argv):
             timeXaxis = TimeAxisItem( orientation = 'bottom' )
             timeXaxis.attachToPlotItem( plotMap[ spec[1] ] )
             plotMap[ spec[1] ].getAxis('bottom').enableAutoSIPrefix( False )
+            plotMap[ spec[1] ].addLegend()
             plotCount += 1
         drawnINplot[c] = plotNumber[ spec[1] ]
         symbolPen = 'k'
@@ -322,9 +324,14 @@ def main(argv):
                                         'left' , str( spec[1] ) ,
                                         str( quantityUnits[ spec[1] ] ) 
                                     )
+    firstPlot = "fillFirstPlot"
     for p in plotMap :
         plotMap[p].setXRange( timeRange[0] , timeRange[1] )
         plotMap[p].showGrid( x = True , y = True )
+        if firstPlot == "fillFirstPlot" :
+            firstPlot = p
+        else :
+            plotMap[p].setXLink( plotMap[firstPlot] )
         if plotNumber[p] == plotCount-1 :
             timeFormat = "%d.%m.%Y"
             if timeRange[1] - timeRange[0] > secondsPER["day"] * 3. :
