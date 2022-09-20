@@ -66,7 +66,7 @@ class TimeAxisItem( pg.AxisItem ) :
                     )
             except ValueError:
                 ticks.append( "" )
-        return ticks   
+        return ticks
     def attachToPlotItem( self , plotItem ) :
         self.setParentItem( plotItem )
         viewBox = plotItem.getViewBox()
@@ -84,10 +84,14 @@ parameters = {
                 "dataFile"         : None                ,
                 "parameterFile"    : None                ,
                 "dateNtimeFormat"  : "%Y-%m-%dT%H:%M:%S" ,
+                "timeZoneHour"     : 1                   ,
                 "timeColumn"       : 0                   ,
                 "valueColumn"      : 3                   ,
                 "specifierColumns" : [ 2 , 1 , 4 ]       ,
-                "markerSize"       : 1.
+                "markerSize"       : 1.                  ,
+                "plotWidth"        : 800                 ,
+                "plotHeight"       : 200                 ,
+                "plotBackground"   : "dark"
             }
 
 specifiers = []
@@ -179,7 +183,10 @@ def readData() :
                                     parameters["dateNtimeFormat"]
                                 )
                                 - 
-                                datetime( 1970 , 1 , 1 , 1 ) # MEZ
+                                datetime(
+                                            1970 , 1 , 1 ,
+                                            int( parameters[ "timeZoneHour" ] )
+                                        )
                             ).total_seconds()
     if startColumn > endColumn :
         swapValues = True
@@ -231,8 +238,9 @@ def main(argv):
     readParameterInput( argv )
     readData()
     app = QtGui.QApplication([])
-    pg.setConfigOption('background', 'w')
-    pg.setConfigOption('foreground', 'k')
+    if parameters[ "plotBackground" ] == "dark" :
+        pg.setConfigOption('background', 'w')
+        pg.setConfigOption('foreground', 'k')
     win = pg.GraphicsLayoutWidget()
     drawnINplot = []
     for spec in specifiers :
@@ -327,7 +335,10 @@ def main(argv):
                                         .strftime(      timeFormat )
                             )
             plotMap[p].setLabel( 'bottom' , axisTitle , units="" )
-    win.resize( 800 , plotCount * 200 )
+    win.resize(
+                int( parameters[ "plotWidth"  ] ) ,
+                int( parameters[ "plotHeight" ] ) * plotCount
+            )
     win.show()
     if ( sys.flags.interactive != 1 ) or not hasattr( QtCore, 'PYQT_VERSION' ) :
         QtGui.QApplication.instance().exec_()
