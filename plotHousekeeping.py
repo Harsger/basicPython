@@ -91,7 +91,8 @@ parameters = {
                 "markerSize"       : 1.                  ,
                 "plotWidth"        : 800                 ,
                 "plotHeight"       : 200                 ,
-                "plotBackground"   : "dark"
+                "plotBackground"   : "dark"              ,
+                "plotGrid"         : ""
             }
 
 specifiers = []
@@ -327,7 +328,12 @@ def main(argv):
     firstPlot = "fillFirstPlot"
     for p in plotMap :
         plotMap[p].setXRange( timeRange[0] , timeRange[1] )
-        plotMap[p].showGrid( x = True , y = True )
+        grid = [ False , False ]
+        if "X" in parameters["plotGrid"] :
+            grid[0] = True
+        if "Y" in parameters["plotGrid"] :
+            grid[1] = True
+        plotMap[p].showGrid( x = grid[0] , y = grid[1] )
         if firstPlot == "fillFirstPlot" :
             firstPlot = p
         else :
