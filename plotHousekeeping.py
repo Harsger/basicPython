@@ -66,7 +66,19 @@ class TimeAxisItem( pg.AxisItem ) :
                     )
             except ValueError:
                 ticks.append( "" )
-        return ticks
+        return ticks   
+    def attachToPlotItem( self , plotItem ) :
+        self.setParentItem( plotItem )
+        viewBox = plotItem.getViewBox()
+        self.linkToView( viewBox )
+        self._oldAxis = plotItem.axes[ self.orientation ][ 'item' ]
+        self._oldAxis.hide()
+        plotItem.axes[ self.orientation ][ 'item' ] = self
+        pos = plotItem.axes[ self.orientation ][ 'pos' ]
+        old_item = plotItem.layout.itemAt(*pos)
+        plotItem.layout.removeItem(old_item)
+        plotItem.layout.addItem( self , *pos )
+        self.setZValue(-1000)
 
 parameters = {
                 "dataFile"         : None                ,
@@ -238,12 +250,11 @@ def main(argv):
                 break
         if not toFill : continue
         plotNumber[p] = plotCount
-        plotMap[p] = win.addPlot( 
-            row = plotCount , col = 0
-            , axisItems = { "bottom" : TimeAxisItem( orientation = 'bottom' ) } 
-        )
-        #plotMap[p].getAxis('bottom').hide()
-        #plotMap[p].vb.addItem( TimeAxisItem( orientation = 'bottom' ) )
+        plotMap[p] = win.addPlot( row = plotCount , col = 0 )
+        plotMap[p].hideAxis('bottom')
+        timeXaxis = TimeAxisItem( orientation = 'bottom' )
+        timeXaxis.attachToPlotItem( plotMap[p] )
+        plotMap[p].getAxis('bottom').enableAutoSIPrefix( False )
         plotCount += 1
         for c , spec in enumerate( specifiers ) :
             if spec[2] == p :
@@ -277,10 +288,11 @@ def main(argv):
         if drawnINplot[c] > -1 : continue
         if spec[1] not in plotNumber :
             plotNumber[ spec[1] ] = plotCount
-            plotMap[ spec[1] ] = win.addPlot( 
-                row = plotCount , col = 0 , 
-                axisItems ={ "bottom" : TimeAxisItem( orientation = 'bottom' ) } 
-            )
+            plotMap[ spec[1] ] = win.addPlot( row = plotCount , col = 0 )
+            plotMap[ spec[1] ].hideAxis('bottom')
+            timeXaxis = TimeAxisItem( orientation = 'bottom' )
+            timeXaxis.attachToPlotItem( plotMap[ spec[1] ] )
+            plotMap[ spec[1] ].getAxis('bottom').enableAutoSIPrefix( False )
             plotCount += 1
         drawnINplot[c] = plotNumber[ spec[1] ]
         symbolPen = 'k'
