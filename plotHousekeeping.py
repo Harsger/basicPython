@@ -265,6 +265,27 @@ def main(argv):
         timeXaxis.attachToPlotItem( plotMap[p] )
         plotMap[p].getAxis('bottom').enableAutoSIPrefix( False )
         plotMap[p].addLegend()
+        unit = quantityUnits[ quantity ]
+        if len( plots[p] ) > 1 :
+            unit = plots[p][1]
+        plotMap[p].setLabel( 'left' , str(plots[p][0]) , units=str(unit) )
+        logYaxis = False
+        if len( plots[p] ) > 4 and plots[p][4] == "log" :
+            logYaxis = True
+            plotMap[p].getAxis('left').enableAutoSIPrefix( False )
+            plotMap[p].getAxis('left').setLogMode( True )
+            if plots[p][2] != "" and plots[p][3] != "" :
+                plotMap[p].setYRange(
+                                        np.log10( float( plots[p][2] ) ) ,
+                                        np.log10( float( plots[p][3] ) ) ,
+                                        padding = 0
+                                    )
+        elif len( plots[p] ) > 3 and plots[p][2] != "" and plots[p][3] != "" :
+            plotMap[p].setYRange(
+                                    float( plots[p][2] ) ,
+                                    float( plots[p][3] ) ,
+                                    padding = 0
+                                )
         plotCount += 1
         for c , spec in enumerate( specifiers ) :
             if spec[2] == p :
@@ -277,6 +298,8 @@ def main(argv):
                         symbolPen = int( spec[3] )
                 if len( spec ) > 4 and spec[4] != "" :
                     symbol    = spec[4]
+                if logYaxis :
+                    data[c][1] = np.log10( data[c][1] )
                 plotMap[p].plot( 
                                 data[c][0] , data[c][1] ,
                                 name        = str( spec[0] ) ,
@@ -286,14 +309,6 @@ def main(argv):
                                 symbol      = symbol ,
                                 symbolSize  = float( parameters["markerSize"] )
                             )
-        unit = quantityUnits[ quantity ]
-        if len( plots[p] ) > 1 :
-            unit = plots[p][1]
-        plotMap[p].setLabel( 'left' , str(plots[p][0]) , units=str(unit) )
-        if len( plots[p] ) > 3 and plots[p][2] != "" and plots[p][3] != "" :
-            plotMap[p].setYRange( float( plots[p][2] ) , float( plots[p][3] ) )
-        if len( plots[p] ) > 4 and plots[p][4] == "log" :
-            plotMap[p].setLogMode( x = False , y = True )
     for c , spec in enumerate( specifiers ) :
         if drawnINplot[c] > -1 : continue
         if spec[1] not in plotNumber :
