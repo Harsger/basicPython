@@ -91,7 +91,7 @@ parameters = {
                 "markerSize"       : 1.                  ,
                 "plotWidth"        : 800                 ,
                 "plotHeight"       : 200                 ,
-                "plotBackground"   : "dark"              ,
+                "plotBackground"   : "white"             ,
                 "plotGrid"         : ""
             }
 
@@ -239,7 +239,9 @@ def main(argv):
     readParameterInput( argv )
     readData()
     app = QtGui.QApplication([])
-    if parameters[ "plotBackground" ] == "dark" :
+    defaultColor = 'w'
+    if parameters[ "plotBackground" ] == "white" :
+        defaultColor = 'k'
         pg.setConfigOption('background', 'w')
         pg.setConfigOption('foreground', 'k')
     win = pg.GraphicsLayoutWidget()
@@ -290,7 +292,7 @@ def main(argv):
         for c , spec in enumerate( specifiers ) :
             if spec[2] == p :
                 drawnINplot[c] = plotNumber[p]
-                symbolPen = 'k'
+                symbolPen = defaultColor
                 symbol    = 'o'
                 if len( spec ) > 3 and spec[3] != "" :
                     symbolPen = spec[3]
@@ -321,7 +323,7 @@ def main(argv):
             plotMap[ spec[1] ].addLegend()
             plotCount += 1
         drawnINplot[c] = plotNumber[ spec[1] ]
-        symbolPen = 'k'
+        symbolPen = defaultColor
         symbol    = 'o'
         if len( spec ) > 3 and spec[3] != "" :
             symbolPen = spec[3]
