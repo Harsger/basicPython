@@ -105,11 +105,15 @@ timeRange = []
 def readParameterInput( argv ) :
     global parameters , specifiers , timeInput , plots
     argc = len( argv )
-    if argc < 2 :
-        print(" ERROR : at least two arguments required ")
+    if argc < 1 :
+        print(" ERROR : at least two arguments required for plotting")
         print("         -> data-file-name and parameter-file-name ")
         sys.exit(1)
-    parameters["dataFile"]      = argv[0]
+    parameters["dataFile"] = argv[0]
+    if argc < 2 :
+        print(" INFO : second argument (parameter-file) required for plotting")
+        print("        -> list with specifier and quantities to plot ")
+        return
     parameters["parameterFile"] = argv[1]
     if argc > 2 :
         timeInput.append( argv[2] )
@@ -194,6 +198,20 @@ def readData() :
         startColumn , endColumn = endColumn , startColumn
     columnStride = endColumn - startColumn
     endColumn = endColumn+1
+    if parameters["parameterFile"] == None :
+        uniqueSpecifier = np.unique(
+                                rawData[
+                                    : , int(parameters["specifierColumns"][0])
+                                ]
+                            )
+        uniqueQuantities = np.unique(
+                                rawData[
+                                    : , int(parameters["specifierColumns"][1])
+                                ]
+                            )
+        for s in uniqueSpecifier :
+            for q in uniqueQuantities :
+                specifiers.append( [ s , q , "" ] )
     for spec in specifiers :
         equalTOspecifier = np.array(
                                 rawData[
@@ -216,6 +234,8 @@ def readData() :
                                     ) ,
                                 startColumn:endColumn:columnStride
                             ].astype(float)
+        if parameters["parameterFile"] == None and timeNvalue.size == 0 :
+            continue
         if swapValues :
             timeNvalue[:,[1,0]] = timeNvalue[:,[0,1]]
         print(
@@ -232,6 +252,8 @@ def readData() :
             quantityUnits[ spec[1] ] = units[0]
         else :
             quantityUnits[ spec[1] ] = ""
+    if parameters["parameterFile"] == None :
+        sys.exit(4)
 
 def main(argv):
     global parameters , specifiers , timeInput , plots , data , timeRange
