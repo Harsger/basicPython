@@ -362,7 +362,7 @@ def main(argv):
         symbolPen = defaultColor
         symbol    = 'o'
         if len( spec ) > 3 and spec[3] != "" :
-            symbolPen = spec[3]
+            symbolPen = int( spec[3] )
         if len( spec ) > 4 and spec[4] != "" :
             symbol    = spec[4]
         plotMap[ spec[1] ].plot( 
