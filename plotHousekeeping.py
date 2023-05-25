@@ -290,18 +290,6 @@ def main(argv):
         timeXaxis = TimeAxisItem( orientation = 'bottom' )
         timeXaxis.attachToPlotItem( plotMap[p] )
         plotMap[p].getAxis('bottom').enableAutoSIPrefix( False )
-#        plotMap[p].addLegend()
-        viewBox = win.addViewBox( row = plotCount , col = 1 )
-        legend = pg.LegendItem(
-                                size = (
-                                        0.08*float(parameters["plotWidth"]) ,
-                                        0.90*float(parameters["plotHeight"])
-                                    )
-                                , offset = ( 1. , 1. )
-                            )
-#        viewBox.addItem( legend )
-        legend.setParentItem( viewBox )
-        viewBox.setMaximumWidth( 0.1*float(parameters["plotWidth"]) )
         unit = quantityUnits[ quantity ]
         if len( plots[p] ) > 1 :
             unit = plots[p][1]
@@ -337,7 +325,7 @@ def main(argv):
                     symbol    = spec[4]
                 if logYaxis :
                     data[c][1] = np.log10( data[c][1] )
-                curve = plotMap[p].plot(
+                plotMap[p].plot(
                                 data[c][0] , data[c][1] ,
                                 name        = str( spec[0] ) ,
                                 pen         = None ,
@@ -346,7 +334,6 @@ def main(argv):
                                 symbol      = symbol ,
                                 symbolSize  = float( parameters["markerSize"] )
                             )
-                legend.addItem( curve , name = curve.opts["name"] )
     for c , spec in enumerate( specifiers ) :
         if drawnINplot[c] > -1 : continue
         if spec[1] not in plotNumber :
@@ -356,7 +343,6 @@ def main(argv):
             timeXaxis = TimeAxisItem( orientation = 'bottom' )
             timeXaxis.attachToPlotItem( plotMap[ spec[1] ] )
             plotMap[ spec[1] ].getAxis('bottom').enableAutoSIPrefix( False )
-            plotMap[ spec[1] ].addLegend()
             plotCount += 1
         drawnINplot[c] = plotNumber[ spec[1] ]
         symbolPen = defaultColor
@@ -401,6 +387,19 @@ def main(argv):
                                         .strftime(      timeFormat )
                             )
             plotMap[p].setLabel( 'bottom' , axisTitle , units="" )
+        viewBox = win.addViewBox( row = plotNumber[p] , col = 1 )
+        legend = pg.LegendItem(
+                                size = (
+                                        0.08*float(parameters["plotWidth"]) ,
+                                        0.90*float(parameters["plotHeight"])
+                                    )
+                                , offset = ( 1. , 1. )
+                            )
+        legend.setParentItem( viewBox )
+        viewBox.setMaximumWidth( 0.1*float(parameters["plotWidth"]) )
+        for data in plotMap[p].allChildItems() :
+            if "PlotDataItem" in str(data.__class__) :
+                legend.addItem( data , name = data.opts["name"] )
     win.resize(
                 int( parameters[ "plotWidth"  ] ) ,
                 int( parameters[ "plotHeight" ] ) * plotCount
