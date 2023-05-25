@@ -317,17 +317,20 @@ def main(argv):
                 drawnINplot[c] = plotNumber[p]
                 symbolPen = defaultColor
                 symbol    = 'o'
+                curveName = str( spec[0] )
                 if len( spec ) > 3 and spec[3] != "" :
                     symbolPen = spec[3]
                     if str( spec[3] ).isdigit() :
                         symbolPen = int( spec[3] )
                 if len( spec ) > 4 and spec[4] != "" :
                     symbol    = spec[4]
+                if len( spec ) > 5 and spec[5] != "" :
+                    curveName = str( spec[5] )
                 if logYaxis :
                     data[c][1] = np.log10( data[c][1] )
                 plotMap[p].plot(
                                 data[c][0] , data[c][1] ,
-                                name        = str( spec[0] ) ,
+                                name        = curveName ,
                                 pen         = None ,
                                 symbolBrush = symbolPen ,
                                 symbolPen   = None ,
@@ -347,13 +350,16 @@ def main(argv):
         drawnINplot[c] = plotNumber[ spec[1] ]
         symbolPen = defaultColor
         symbol    = 'o'
+        curveName = str( spec[0] )
         if len( spec ) > 3 and spec[3] != "" :
             symbolPen = int( spec[3] )
         if len( spec ) > 4 and spec[4] != "" :
             symbol    = spec[4]
+        if len( spec ) > 5 and spec[5] != "" :
+            curveName = str( spec[5] )
         plotMap[ spec[1] ].plot( 
                                 data[c][0] , data[c][1] ,
-                                name        = str( spec[0] ) ,
+                                name        = curveName ,
                                 pen         = None ,
                                 symbolBrush = symbolPen ,
                                 symbolPen   = None ,
