@@ -88,6 +88,7 @@ parameters = {
                 "timeColumn"       : 0                   ,
                 "valueColumn"      : 3                   ,
                 "specifierColumns" : [ 2 , 1 , 4 ]       ,
+                "maxColumn"        : 4                   ,
                 "markerSize"       : 1.                  ,
                 "plotWidth"        : 800                 ,
                 "plotHeight"       : 200                 ,
@@ -160,7 +161,18 @@ def readParameterInput( argv ) :
 
 def readData() :
     global parameters , specifiers , data , timeInput , timeRange
-    rawData = np.loadtxt( parameters["dataFile"] , dtype='U' )
+    usedColumns = [
+                    int(parameters["timeColumn"]) ,
+                    int(parameters["valueColumn"])
+                ]
+    for c in parameters["specifierColumns"] :
+        usedColumns.append( int(c) )
+    parameters["maxColumn"] = max( usedColumns )
+    rawData = np.loadtxt(
+                            parameters["dataFile"] ,
+                            dtype='U' ,
+                            usecols=range( parameters["maxColumn"]+1 )
+                        )
     if rawData.shape[0] < 1 :
         print(" ERROR : data empty ")
         sys.exit(3)
