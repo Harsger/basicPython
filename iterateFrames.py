@@ -4,6 +4,10 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.backend_bases import NavigationToolbar2, Event
 
+if int(mpl.__version__[0]) > 2 :
+    from matplotlib.backend_tools import ToolBase
+    plt.rcParams['toolbar'] = 'toolmanager'
+
 parameters = {
                 "parameterFile" :   None ,
                 "dataFile"      :   None ,
@@ -32,7 +36,7 @@ data = np.zeros( ( 1 , int(parameters["ncols"]) , int(parameters["nrows"] ) ) )
 
 def draw_current_frame():
     global parameters , data , drawables
-    
+
     if int(parameters["nframes"]) != data.shape[0]:
         parameters["nframes"] = data.shape[0]
         
@@ -42,7 +46,7 @@ def draw_current_frame():
         int(parameters["frame_index"]) < -1
     ):
         return
-    
+
     if int(parameters["frame_index"]) == -1:
         singleFrame = parameters["offset"]
         drawables["ax"].set_title("offset")
@@ -66,10 +70,16 @@ def draw_current_frame():
     else:
         vmax = np.amax( singleFrame )
     norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
-    
-    column_array = np.arange(-0.5,int(parameters["ncols"]),1)
-    row_array    = np.arange(-0.5,int(parameters["nrows"]),1)
-    
+
+    if int(mpl.__version__[0]) < 3 :
+        column_array = np.arange(-0.5,int(parameters["ncols"]),1)
+        row_array    = np.arange(-0.5,int(parameters["nrows"]),1)
+    else :
+        column_array , row_array = np.meshgrid(
+                        np.arange(0,int(parameters["ncols"]),1) ,
+                        np.arange(0,int(parameters["nrows"]),1)
+                    )
+
     if parameters["mapFile"] != None:
         drawFrame = np.zeros( ( 
                                 int(parameters["nrows"]) , 
@@ -80,16 +90,17 @@ def draw_current_frame():
                     parameters["colmap"].flatten()
                 ] = singleFrame.flatten()
         singleFrame = drawFrame
-    
+
     drawables["pcm"] = drawables["ax"].pcolormesh( 
                             column_array , 
                             row_array , 
-                            singleFrame , 
+                            singleFrame ,
                             norm=norm , 
                             shading='nearest' 
                         )
     drawables["ax"].set_xlabel("columns")
     drawables["ax"].set_ylabel("rows")
+
     if drawables["cb"] == None:
         drawables["cb"] = drawables["fig"].colorbar(
                                                     drawables["pcm"] , 
@@ -97,58 +108,110 @@ def draw_current_frame():
                                                     norm=norm
                                                 )
         drawables["cb"].ax.set_ylabel("ADU")
-    else:
-        drawables["cb"].on_mappable_changed( drawables["pcm"] )
+    else :
+        drawables["cb"].mappable.set_clim( vmin=vmin , vmax=vmax )
+
     plt.tight_layout()
-    plt.show()
 
-back = NavigationToolbar2.back
-def new_back(self, *args, **kwargs):
-    global parameters , data , drawables
-    if( 
-        int(parameters["frame_index"]) > 0
-        and
-        int(parameters["frame_index"]) != int(parameters["nframes"])
-    ):
-        parameters["frame_index"]=int(parameters["frame_index"])-1
-    else:
-        parameters["frame_index"]=int(parameters["start_frame"])
-    draw_current_frame()
-    back(self, *args, **kwargs)
-NavigationToolbar2.back = new_back
+    if parameters["toShow"] :
+        parameters["toShow"] = False
+        plt.show()
+    else :
+        plt.draw()
 
-forward = NavigationToolbar2.forward
-def new_forward(self, *args, **kwargs):
-    global parameters , data , drawables
-    if( 
-        int(parameters["frame_index"]) < int(parameters["nframes"])
-        and
-        int(parameters["frame_index"]) != -1
-    ):
-        parameters["frame_index"]=int(parameters["frame_index"])+1
-    else:
-        parameters["frame_index"]=int(parameters["start_frame"])
-    draw_current_frame()
-    forward(self, *args, **kwargs)
-NavigationToolbar2.forward = new_forward
+if int(mpl.__version__[0]) > 2 :
 
-home = NavigationToolbar2.home
-def new_home(self, *args, **kwargs):
-    global parameters , data , drawables
-    if( 
-        int(parameters["frame_index"]) != -1
-        and
-        int(parameters["frame_index"]) != int(parameters["nframes"])
-    ):
-        parameters["last_frame"] = int(parameters["frame_index"])
-        parameters["frame_index"] = -1
-    elif parameters["frame_index"] != int(parameters["nframes"]):
-        parameters["frame_index"] = int(parameters["nframes"])
-    else:
-        parameters["frame_index"]=int(parameters["last_frame"])
-    draw_current_frame()
-    home(self, *args, **kwargs)
-NavigationToolbar2.home = new_home
+    class new_back(ToolBase) :
+        def trigger(self, *args, **kwargs) :
+            global parameters , data , drawables
+            if(
+                int(parameters["frame_index"]) > 0
+                and
+                int(parameters["frame_index"]) != int(parameters["nframes"])
+            ):
+                parameters["frame_index"]=int(parameters["frame_index"])-1
+            else:
+                parameters["frame_index"]=int(parameters["start_frame"])
+            draw_current_frame()
+
+    class new_forward(ToolBase) :
+        def trigger(self, *args, **kwargs) :
+            global parameters , data , drawables
+            if(
+                int(parameters["frame_index"]) < int(parameters["nframes"])
+                and
+                int(parameters["frame_index"]) != -1
+            ):
+                parameters["frame_index"]=int(parameters["frame_index"])+1
+            else:
+                parameters["frame_index"]=int(parameters["start_frame"])
+            draw_current_frame()
+
+    class new_home(ToolBase) :
+        def trigger(self, *args, **kwargs) :
+            global parameters , data , drawables
+            if(
+                int(parameters["frame_index"]) != -1
+                and
+                int(parameters["frame_index"]) != int(parameters["nframes"])
+            ):
+                parameters["last_frame"] = int(parameters["frame_index"])
+                parameters["frame_index"] = -1
+            elif parameters["frame_index"] != int(parameters["nframes"]):
+                parameters["frame_index"] = int(parameters["nframes"])
+            else:
+                parameters["frame_index"]=int(parameters["last_frame"])
+            draw_current_frame()
+
+else :
+
+    back = NavigationToolbar2.back
+    def new_back(self, *args, **kwargs):
+        global parameters , data , drawables
+        if(
+            int(parameters["frame_index"]) > 0
+            and
+            int(parameters["frame_index"]) != int(parameters["nframes"])
+        ):
+            parameters["frame_index"]=int(parameters["frame_index"])-1
+        else:
+            parameters["frame_index"]=int(parameters["start_frame"])
+        draw_current_frame()
+        back(self, *args, **kwargs)
+    NavigationToolbar2.back = new_back
+
+    forward = NavigationToolbar2.forward
+    def new_forward(self, *args, **kwargs):
+        global parameters , data , drawables
+        if(
+            int(parameters["frame_index"]) < int(parameters["nframes"])
+            and
+            int(parameters["frame_index"]) != -1
+        ):
+            parameters["frame_index"]=int(parameters["frame_index"])+1
+        else:
+            parameters["frame_index"]=int(parameters["start_frame"])
+        draw_current_frame()
+        forward(self, *args, **kwargs)
+    NavigationToolbar2.forward = new_forward
+
+    home = NavigationToolbar2.home
+    def new_home(self, *args, **kwargs):
+        global parameters , data , drawables
+        if(
+            int(parameters["frame_index"]) != -1
+            and
+            int(parameters["frame_index"]) != int(parameters["nframes"])
+        ):
+            parameters["last_frame"] = int(parameters["frame_index"])
+            parameters["frame_index"] = -1
+        elif parameters["frame_index"] != int(parameters["nframes"]):
+            parameters["frame_index"] = int(parameters["nframes"])
+        else:
+            parameters["frame_index"]=int(parameters["last_frame"])
+        draw_current_frame()
+        home(self, *args, **kwargs)
+    NavigationToolbar2.home = new_home
 
 def readParameterInput(argv):
     global parameters , data
@@ -168,7 +231,7 @@ def readParameterInput(argv):
         print(" ERROR : no data specified ")
         sys.exit(2)
     data = np.load( parameters["dataFile"] )
-    if data == None:
+    if len( data ) == 0:
         print(" ERROR : data can not be read ")
         sys.exit(3)
     (parameters["nframes"],parameters["npixels"]) = data.shape
@@ -225,7 +288,26 @@ def main(argv):
     readParameterInput(argv)
     parameters["frame_index"] = int(parameters["start_frame"])
     drawables["fig"] , drawables["ax"] = plt.subplots()
+    parameters["toShow"] = True
+    if int(mpl.__version__[0]) > 2 :
+        tm = drawables["fig"].canvas.manager.toolmanager
+        tm.add_tool( "<" , new_back )
+        tm.add_tool( "o" , new_home )
+        tm.add_tool( ">" , new_forward )
+        drawables["fig"].canvas.manager.toolbar.add_tool(
+                                                            tm.get_tool("<") ,
+                                                            "toolgroup"
+                                                        )
+        drawables["fig"].canvas.manager.toolbar.add_tool(
+                                                            tm.get_tool("o") ,
+                                                            "toolgroup"
+                                                        )
+        drawables["fig"].canvas.manager.toolbar.add_tool(
+                                                            tm.get_tool(">") ,
+                                                            "toolgroup"
+                                                        )
     draw_current_frame()
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+
