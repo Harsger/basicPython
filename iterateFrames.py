@@ -22,7 +22,9 @@ parameters = {
                 "offset"        :   None ,
                 "offsetFile"    : "none" ,
                 "rangeMin"      :   None ,
-                "rangeMax"      :   None 
+                "rangeMax"      :   None ,
+                "threshold"     :      5 ,
+                "commonMode"    : "none"
             }
 
 drawables = {
@@ -70,6 +72,8 @@ def draw_current_frame():
     else:
         vmax = np.amax( singleFrame )
     norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+
+    print(" ["+str(vmin)+","+str(vmax)+"]")
 
     if int(mpl.__version__[0]) < 3 :
         column_array = np.arange(-0.5,int(parameters["ncols"]),1)
@@ -213,6 +217,105 @@ else :
         home(self, *args, **kwargs)
     NavigationToolbar2.home = new_home
 
+def calculateBasics():
+    global parameters , data
+    if parameters["mapFile"] != None :
+        dataCor = data
+        offsetEstimate = 0.
+        commonMode = 0.
+    else :
+        offsetEstimate = np.median( data , axis=0 )
+        if parameters["commonMode"] == "COLUMN" :
+            commonMode = np.array([
+                np.median(
+                            data[
+                                : ,
+                                c
+                                : int(parameters["npixels"])
+                                : int(parameters["ncols"])
+                            ]
+                            -
+                            offsetEstimate[
+                                c
+                                : int(parameters["npixels"])
+                                : int(parameters["ncols"])
+                            ]
+                            ,
+                            axis=1
+                        )
+                for c in range( int(parameters["ncols"]) )
+            ]).transpose()
+            dataCor = np.array([
+                np.subtract(
+                    data[
+                            : ,
+                            c
+                            : int(parameters["npixels"])
+                            : int(parameters["ncols"])
+                    ].transpose() ,
+                    commonMode[:,c]
+                ).transpose()
+                for c in range( int(parameters["ncols"]) )
+            ]).transpose((1,2,0)).reshape( (
+                int(parameters["nframes"]) , int(parameters["npixels"])
+            ) )
+        else :
+            commonMode = np.array([
+                np.median(
+                            data[
+                                : ,
+                                r*int(parameters["ncols"])
+                                : (r+1)*int(parameters["ncols"])
+                            ]
+                            -
+                            offsetEstimate[
+                                r*int(parameters["ncols"])
+                                : (r+1)*int(parameters["ncols"])
+                            ]
+                            ,
+                            axis=1
+                        )
+                for r in range( int(parameters["nrows"]) )
+            ]).transpose()
+            dataCor = np.array([
+                np.subtract(
+                    data[
+                        : ,
+                        r*int(parameters["ncols"])
+                        : (r+1)*int(parameters["ncols"])
+                    ].transpose() ,
+                    commonMode[:,r]
+                ).transpose()
+                for r in range( int(parameters["nrows"]) )
+            ]).transpose((1,0,2)).reshape( (
+                int(parameters["nframes"]) , int(parameters["npixels"])
+            ) )
+    modeVariation = np.std( commonMode )
+    print( " common mode variation " + str( modeVariation ) )
+    underThreshold = np.abs( dataCor - offsetEstimate ) \
+                     < float(parameters["threshold"]) * modeVariation
+    accumulation = np.sum( underThreshold , axis=0 )
+    print(
+            " over threshold ["
+            +str( int(parameters["nframes"]) - accumulation.max() )
+            +","
+            +str( int(parameters["nframes"]) - accumulation.min() )
+            +"]"
+    )
+    if int(np.__version__[2:4].replace(".","")) > 19 :
+        parameters["offset"] = \
+                        np.mean( dataCor , axis=0 , where=underThreshold )\
+                          .reshape( parameters["frameSize"] )
+        parameters["noise" ] = \
+                        np.std(  dataCor , axis=0 , where=underThreshold )\
+                          .reshape( parameters["frameSize"] )
+    else :
+        baseline = np.where( underThreshold , dataCor , float("nan") )
+        parameters["offset"] = np.nanmean( baseline , axis=0 )\
+                                 .reshape( parameters["frameSize"] )
+        parameters["noise" ] = np.nanstd(  baseline , axis=0 )\
+                                .reshape( parameters["frameSize"] )
+
 def readParameterInput(argv):
     global parameters , data
     if len(argv) < 1:
@@ -246,7 +349,17 @@ def readParameterInput(argv):
     parameters["frameSize"] = ( 
                                 int(parameters["ncols"]) , 
                                 int(parameters["nrows"]) 
-                            ) 
+                            )
+###############################################################################
+#    print(" reshaping data ... ")
+#    data = data.reshape( (
+#                            parameters["nframes"] ,
+#                            int(parameters["nrows"]) ,
+#                            int(parameters["ncols"])
+#                        ) )
+#    data = data.transpose( ( 0 , 2 , 1 ) )
+#    data = data.reshape( ( parameters["nframes"] , parameters["npixels"] ) )
+###############################################################################
     if parameters["mapFile"] != None:
         parameters["rowmap"] = np.load( parameters["mapFile"] )["rowmap"   ]
         parameters["colmap"] = np.load( parameters["mapFile"] )["columnmap"]
@@ -259,23 +372,34 @@ def readParameterInput(argv):
         parameters["frameSize"] = tuple( parameters["rowmap"].shape )
     if parameters["offsetFile"] == "none" :
         print(" OFFSET from current file ")
-        parameters["offset"] = np.reshape( 
-                                            np.average( data , axis=0 ), 
-                                            parameters["frameSize"]
-                                        )
-        parameters["noise" ] = np.reshape( 
-                                            np.std( data , axis=0 ) , 
-                                            parameters["frameSize"] 
-                                        )
+        if parameters["commonMode"] in [ "ROW" , "COLUMN" ] :
+            calculateBasics()
+        else :
+            parameters["offset"] = np.reshape(
+                                                np.average( data , axis=0 ),
+                                                parameters["frameSize"]
+                                            )
+            parameters["noise" ] = np.reshape(
+                                                np.std( data , axis=0 ) ,
+                                                parameters["frameSize"]
+                                            )
     elif parameters["offsetFile"].endswith(".npy") :
         print(" OFFSET from provided file ")
         offsetData = np.load( parameters["offsetFile"] )
-        parameters["offset"] = np.reshape( 
-                                            np.average( offsetData , axis=0 ), 
+        if parameters["commonMode"] in [ "ROW" , "COLUMN" ] :
+            swapData = data
+            data = offsetData
+            parameters["nframes"] = offsetData.shape[0]
+            calculateBasics()
+            data = swapData
+            parameters["nframes"] = data.shape[0]
+        else :
+            parameters["offset"] = np.reshape(
+                                            np.average( offsetData , axis=0 ),
                                             parameters["frameSize"]
                                         )
-        parameters["noise" ] = np.reshape( 
-                                            np.std( offsetData , axis=0 ), 
+            parameters["noise" ] = np.reshape(
+                                            np.std( offsetData , axis=0 ),
                                             parameters["frameSize"]
                                         )
     else:
